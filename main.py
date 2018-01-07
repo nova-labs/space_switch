@@ -36,8 +36,9 @@ EVENT_TYPE = "novalabs_space"
 LOG_FILE = 'space_switch.log'
 
 EVENT_SERVICE_BASE_URL = "http://localhost:8080"
-EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/event/events"
-EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/event/events/" + EVENT_TYPE + "/latest"
+#EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
+EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
+EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
 SWITCH_GPIO = 15
 PIXEL_GPIO = 4
@@ -319,4 +320,3 @@ while True:
     old_switch_state = current_switch_state
     logger.info("SWITCH: new value %d" % old_switch_state)
     handle_switch_change(old_switch_state)
-
