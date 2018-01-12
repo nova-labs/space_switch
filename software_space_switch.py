@@ -30,13 +30,13 @@ EVENT_TYPE = "novalabs_space"
 LOG_FILE = 'software_space_switch.log'
 
 
-EVENT_SERVICE_BASE_URL = "http://localhost:8080"
-#EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
+#EVENT_SERVICE_BASE_URL = "http://localhost:8080"
+EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
 EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
 EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
-SWITCH_GPIO = 15
-PIXEL_GPIO = 4
+SWITCH_GPIO = 23
+PIXEL_GPIO = 18
 PIXEL_COUNT = 12
 
 PIXEL_ALL = list(range(PIXEL_COUNT))

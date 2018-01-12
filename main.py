@@ -21,13 +21,15 @@
 #
 #
 
-import network, requests, json, time, math
-from machine import Pin
-import neopixel
-
-# WiFi credentials
-WIFI_SSID = "Nova Labs"
-WIFI_PASSWORD = "robots4u"
+import json
+import logging
+import math
+import requests
+import signal
+import sys
+import time
+import RPi.GPIO as GPIO
+from neopixel import *
 
 # Event Service type - this needs to be unique and not change over time
 EVENT_TYPE = "novalabs_space"
@@ -35,29 +37,39 @@ EVENT_TYPE = "novalabs_space"
 # log file to this script
 LOG_FILE = 'space_switch.log'
 
-EVENT_SERVICE_BASE_URL = "http://localhost:8080"
-#EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
+#EVENT_SERVICE_BASE_URL = "http://localhost:8080"
+EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
 EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
 EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
-SWITCH_GPIO = 15
-PIXEL_GPIO = 4
-PIXEL_COUNT = 12
+SWITCH_GPIO = 23
 
-PIXEL_ALL = list(range(PIXEL_COUNT))
-PIXEL_HALF = math.floor(PIXEL_COUNT/2)
-PIXEL_75_PCT = math.floor(PIXEL_COUNT*.75)
+LED_COUNT      = 12      # Number of LED pixels.
+LED_GPIO_PIN   = 18      # GPIO pin connected to the pixels (18 uses PWM!).
+#LED_GPIO_PIN   = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
+LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
+LED_DMA        = 10      # DMA channel to use for generating signal (try 10)
+LED_BRIGHTNESS = 255     # Set to 0 for darkest and 255 for brightest
+LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
+LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+LED_STRIP      = ws.WS2811_STRIP_GRB   # Strip type and colour ordering
+
+
+PIXEL_ALL = list(range(LED_COUNT))
+PIXEL_HALF = math.floor(LED_COUNT/2)
+PIXEL_75_PCT = math.floor(LED_COUNT*.75)
 PIXEL_FIRST_HALF = list(range(0, PIXEL_75_PCT))
-PIXEL_SECOND_HALF = list(range(PIXEL_75_PCT, PIXEL_COUNT))
+PIXEL_SECOND_HALF = list(range(PIXEL_75_PCT, LED_COUNT))
 
-RED = (255, 0, 0)
-RED_DARK = (100, 0, 0)
-GREEN = (0, 255, 0)
-GREEN_DARK = (0, 100, 0)
-YELLOW = (255, 255, 0)
-GREY = (100, 100, 100)
-GREY_DARK = (50, 50, 50)
-OFF = (0, 0, 0)
+# red & green are switched from some reason, hence the mapping
+RED        = Color(0, 255, 0)
+RED_DARK   = Color(0, 50, 0)
+GREEN      = Color(255, 0, 0)
+GREEN_DARK = Color(50, 0, 0)
+YELLOW     = Color(255, 255, 0)
+GREY       = Color(50, 50, 50)
+GREY_DARK  = Color(20, 20, 20)
+OFF        = Color(0, 0, 0)
 
 STATE_OPEN = "open"
 STATE_CLOSED = "closed"
@@ -68,37 +80,35 @@ UNKNOWN_UUID = "00000000-0000-0000-0000-000000000000"
 ERROR_EVENT = {"type": EVENT_TYPE, "value": STATE_ERROR, "epochMillis": 0, "uuid": UNKNOWN_UUID}
 NONE_EVENT = {"type": EVENT_TYPE, "value": STATE_NONE, "epochMillis": 0, "uuid": UNKNOWN_UUID}
 
-HTTP_OK = 200
-HTTP_CREATED = 201
+HTTP_OK        = 200
+HTTP_CREATED   = 201
 HTTP_NOT_FOUND = 404
-HTTP_ERROR = 500
+HTTP_ERROR     = 500
 
 LOG_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)8s --- %(message)s'
 logging.basicConfig(filename=LOG_FILE, filemode='a', format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
 logger = logging.getLogger("space_switch")
 
 
-#
-# connect to WiFi
-#
-def novalabs_connect():
-    logger.info("WIFI: connecting to wifi...")
-    sta_if = network.WLAN(network.STA_IF)
-    sta_if.active(True)
-    #sta_if.scan()                          # Scan for available access points
-    while not sta_if.isconnected():
-        sta_if.connect(WIFI_SSID, WIFI_PASSWORD) # Connect to an AP
-    logger.info("WIFI: connected to wifi")
+def signal_handler(signal, frame):
+        colorWipe(strip, Color(0,0,0))
+        sys.exit(0)
 
+# Define functions which animate LEDs in various ways.
+def colorWipe(strip, color, wait_ms=50):
+        """Wipe color across display a pixel at a time."""
+        for i in range(strip.numPixels()):
+                strip.setPixelColor(i, color)
+                strip.show()
+                time.sleep(wait_ms/1000.0)
 
 #
 # shine all pixels this color
 #
 def shine_all(color):
     logger.info("LED: shining all | color %s" % repr(color))
-    for i in PIXEL_ALL:
-        np[i] = color
-    np.write()
+    colorWipe(strip, color)
+    strip.show()
 
 
 #
@@ -107,8 +117,8 @@ def shine_all(color):
 def shine_second_half(color):
     logger.info("LED: shining second half | color %s" % repr(color))
     for i in PIXEL_SECOND_HALF:
-        np[i] = color
-    np.write()
+        strip.setPixelColor(i, color)
+    strip.show()
 
 
 #
@@ -116,9 +126,9 @@ def shine_second_half(color):
 #
 def shine_alternate(color):
     logger.info("LED: shining alternate | color %s" % repr(color))
-    for i in range(PIXEL_COUNT)[::2]:
-        np[i] = color
-    np.write()
+    for i in range(LED_COUNT)[::2]:
+        strip.setPixelColor(i, color)
+    strip.show()
 
 
 # turn all green to indicate Event Service latest event is open
@@ -186,7 +196,7 @@ def shine_new_state(state):
 #
 def epoch_time():
     millis_float = math.floor(time.time() * 1000)
-    return long(millis_float)
+    return int(millis_float)
 
 
 #
@@ -280,7 +290,6 @@ def update_closed():
 # handle switch change
 #
 def handle_switch_change(switch_state):
-    novalabs_connect()
     logger.info("SWITCH: handling switch state change | state %d" % switch_state)
     if switch_state == 0:
         update_closed()
@@ -296,27 +305,31 @@ def handle_switch_change(switch_state):
 logger.info("STARTUP: starting")
 
 # setup NeoPixel
-np = neopixel.NeoPixel(Pin(PIXEL_GPIO), PIXEL_COUNT)
-logger.info("STARTUP: %d neopixels on GPIO %d" % (PIXEL_COUNT, PIXEL_GPIO))
+strip = Adafruit_NeoPixel(LED_COUNT, LED_GPIO_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+strip.begin()
+logger.info("STARTUP: %d neopixels on GPIO %d" % (LED_COUNT, LED_GPIO_PIN))
 
 # setup switch
-switch = Pin(SWITCH_GPIO, Pin.IN, pull=Pin.PULL_UP)
-#switch.irq(trigger=Pin.IRQ_RISING|Pin.IRQ_FALLING, handler=notify_switch_changed)
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+GPIO.setup(SWITCH_GPIO, GPIO.IN)
 logger.info("STARTUP: switch on GPIO %d" % (SWITCH_GPIO))
 
 # start with all LEDs dark grey
 shine_boot()
 
 # get current switch value, update state with Event Service
-old_switch_state = switch.value()
+#old_switch_state = switch.value()
+old_switch_state = GPIO.input(SWITCH_GPIO)
+logger.info("STARTUP: initial value %d" % old_switch_state)
 handle_switch_change(old_switch_state)
 
-logger.info("STARTUP: initial value %d" % old_switch_state)
 while True:
-    current_switch_state = switch.value()
+    #current_switch_state = switch.value()
+    current_switch_state = GPIO.input(SWITCH_GPIO)
     if old_switch_state == current_switch_state:
-        time.sleep_ms(100)
+        time.sleep(.01)
         continue
     old_switch_state = current_switch_state
-    logger.info("SWITCH: new value %d" % old_switch_state)
-    handle_switch_change(old_switch_state)
+    logger.info("SWITCH: new value %d" % current_switch_state)
+    handle_switch_change(current_switch_state)
