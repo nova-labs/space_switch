@@ -325,6 +325,9 @@ logger.info("STARTUP: initial value %d" % old_switch_state)
 handle_switch_change(old_switch_state)
 
 signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGABRT, signal_handler)
+signal.signal(signal.SIGHUP, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 while True:
     #current_switch_state = switch.value()
