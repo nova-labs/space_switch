@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 #
-# Nova Labs space_switch
+# Nova Labs software space_switch
 # This script handles the hardware space switch and updating the state in the Nova Labs Event Service.  Toggling the
 # physical switch updates the Event Service with the update state and changes the physical LEDs.  The LEDs indicate the
 # current state.
@@ -21,21 +21,14 @@
 #
 #
 
-import json
-import logging
-import math
-import requests
-import signal
-import sys
-import time
-import RPi.GPIO as GPIO
-from neopixel import *
+import requests, json, time, math, logging, sys
 
 # Event Service type - this needs to be unique and not change over time
 EVENT_TYPE = "novalabs_space"
 
 # log file to this script
-LOG_FILE = 'space_switch.log'
+LOG_FILE = 'software_space_switch.log'
+
 
 #EVENT_SERVICE_BASE_URL = "http://localhost:8080"
 EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
@@ -43,33 +36,25 @@ EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
 EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
 SWITCH_GPIO = 23
+PIXEL_GPIO = 18
+PIXEL_COUNT = 12
 
-LED_COUNT      = 12      # Number of LED pixels.
-LED_GPIO_PIN   = 18      # GPIO pin connected to the pixels (18 uses PWM!).
-#LED_GPIO_PIN   = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
-LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
-LED_DMA        = 10      # DMA channel to use for generating signal (try 10)
-LED_BRIGHTNESS = 255     # Set to 0 for darkest and 255 for brightest
-LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
-LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
-LED_STRIP      = ws.WS2811_STRIP_GRB   # Strip type and colour ordering
-
-
-PIXEL_ALL = list(range(LED_COUNT))
-PIXEL_HALF = math.floor(LED_COUNT/2)
-PIXEL_75_PCT = math.floor(LED_COUNT*.75)
+PIXEL_ALL = list(range(PIXEL_COUNT))
+PIXEL_HALF = math.floor(PIXEL_COUNT/2)
+PIXEL_75_PCT = math.floor(PIXEL_COUNT*.75)
 PIXEL_FIRST_HALF = list(range(0, PIXEL_75_PCT))
-PIXEL_SECOND_HALF = list(range(PIXEL_75_PCT, LED_COUNT))
+PIXEL_SECOND_HALF = list(range(PIXEL_75_PCT, PIXEL_COUNT))
+PIXEL_CHAR = "*"
 
-# red & green are switched from some reason, hence the mapping
-RED        = Color(0, 255, 0)
-RED_DARK   = Color(0, 50, 0)
-GREEN      = Color(255, 0, 0)
-GREEN_DARK = Color(50, 0, 0)
-YELLOW     = Color(255, 255, 0)
-GREY       = Color(50, 50, 50)
-GREY_DARK  = Color(20, 20, 20)
-OFF        = Color(0, 0, 0)
+RED = '\033[38;5;196m'
+RED_DARK = '\033[38;5;88m'
+GREEN = '\033[38;5;10m'
+GREEN_DARK = '\033[38;5;2m'
+YELLOW = '\033[38;5;11m'
+GREY = '\033[38;5;243m'
+GREY_DARK = '\033[38;5;236m'
+OFF = '\033[38;5;233m'
+COLOR_RESET = '\033[0m'
 
 STATE_OPEN = "open"
 STATE_CLOSED = "closed"
@@ -80,55 +65,65 @@ UNKNOWN_UUID = "00000000-0000-0000-0000-000000000000"
 ERROR_EVENT = {"type": EVENT_TYPE, "value": STATE_ERROR, "epochMillis": 0, "uuid": UNKNOWN_UUID}
 NONE_EVENT = {"type": EVENT_TYPE, "value": STATE_NONE, "epochMillis": 0, "uuid": UNKNOWN_UUID}
 
-HTTP_OK        = 200
-HTTP_CREATED   = 201
+HTTP_OK = 200
+HTTP_CREATED = 201
 HTTP_NOT_FOUND = 404
-HTTP_ERROR     = 500
+HTTP_ERROR = 500
 
 LOG_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)8s --- %(message)s'
 logging.basicConfig(filename=LOG_FILE, filemode='a', format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
 logger = logging.getLogger("space_switch")
 
 
-def signal_handler(signal, frame):
-        colorWipe(strip, Color(0,0,0))
-        sys.exit(0)
+#
+# connect to WiFi
+#
+def novalabs_connect():
+    logger.info("WIFI: connecting to wifi...")
+    logger.info("WIFI: connected to wifi")
 
-# Define functions which animate LEDs in various ways.
-def colorWipe(strip, color, wait_ms=50):
-        """Wipe color across display a pixel at a time."""
-        for i in range(strip.numPixels()):
-                strip.setPixelColor(i, color)
-                strip.show()
-                time.sleep(wait_ms/1000.0)
+#
+#
+#
+def print_pixels():
+    global np
+    pixel_str = ""
+    for color in np:
+        pixel_str += color + PIXEL_CHAR
+    pixel_str += COLOR_RESET
+    print(pixel_str)
 
 #
 # shine all pixels this color
 #
 def shine_all(color):
+    global np
     logger.info("LED: shining all | color %s" % repr(color))
-    colorWipe(strip, color)
-    strip.show()
+    for i in PIXEL_ALL:
+        np[i] = color
+    print_pixels()
 
 
 #
 # shine second half of the LEDs to this color
 #
 def shine_second_half(color):
+    global np
     logger.info("LED: shining second half | color %s" % repr(color))
     for i in PIXEL_SECOND_HALF:
-        strip.setPixelColor(i, color)
-    strip.show()
+        np[i] = color
+    print_pixels()
 
 
 #
 # shine every other pixel to this color
 #
 def shine_alternate(color):
+    global np
     logger.info("LED: shining alternate | color %s" % repr(color))
-    for i in range(LED_COUNT)[::2]:
-        strip.setPixelColor(i, color)
-    strip.show()
+    for i in range(PIXEL_COUNT)[::2]:
+        np[i] = color
+    print_pixels()
 
 
 # turn all green to indicate Event Service latest event is open
@@ -249,6 +244,7 @@ def update_state(state):
             code = response.status_code
         except:
             code = HTTP_ERROR
+
         logger.info("UPDATE: Response to update | code %d" % code)
         retries = retries - 1
         time.sleep(1)
@@ -290,6 +286,7 @@ def update_closed():
 # handle switch change
 #
 def handle_switch_change(switch_state):
+    novalabs_connect()
     logger.info("SWITCH: handling switch state change | state %d" % switch_state)
     if switch_state == 0:
         update_closed()
@@ -299,39 +296,74 @@ def handle_switch_change(switch_state):
         logger.info("SWITCH: unknown switch state | state %d" % switch_state)
 
 
+def _find_getch():
+    try:
+        import termios
+    except ImportError:
+        # Non-POSIX. Return msvcrt's (Windows') getch.
+        import msvcrt
+        return msvcrt.getch
+
+    # POSIX system. Create and return a getch that manipulates the tty.
+    import sys, tty
+    def _getch():
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+    return _getch
+
 # ----------------------------------------------------------------------------
 # start up
 # ----------------------------------------------------------------------------
 logger.info("STARTUP: starting")
 
-# setup NeoPixel
-strip = Adafruit_NeoPixel(LED_COUNT, LED_GPIO_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-strip.begin()
-logger.info("STARTUP: %d neopixels on GPIO %d" % (LED_COUNT, LED_GPIO_PIN))
+# set all pixels to "OFF"
+np = [OFF] * PIXEL_COUNT
 
-# setup switch
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
-GPIO.setup(SWITCH_GPIO, GPIO.IN)
-logger.info("STARTUP: switch on GPIO %d" % (SWITCH_GPIO))
+print("===== Nova Labs Software Space Switch =====")
+print("starting up ...\n")
 
 # start with all LEDs dark grey
 shine_boot()
 
-# get current switch value, update state with Event Service
-#old_switch_state = switch.value()
-old_switch_state = GPIO.input(SWITCH_GPIO)
-logger.info("STARTUP: initial value %d" % old_switch_state)
-handle_switch_change(old_switch_state)
+# get latest event state from Event Service
+event = get_latest_event()
+# change LEDs to reflect current state (from Event Service)
+shine_new_state(event["value"])
 
-signal.signal(signal.SIGINT, signal_handler)
+if event["value"] == STATE_OPEN:
+    switch_state = 1
+elif event["value"] == STATE_CLOSED:
+    switch_state = 0
+else:
+    switch_state = -1
+
+getch = _find_getch()
 
 while True:
-    #current_switch_state = switch.value()
-    current_switch_state = GPIO.input(SWITCH_GPIO)
-    if old_switch_state == current_switch_state:
-        time.sleep(.01)
-        continue
-    old_switch_state = current_switch_state
-    logger.info("SWITCH: new value %d" % current_switch_state)
-    handle_switch_change(current_switch_state)
+    pos = "UNKNOWN"
+    if switch_state == 1:
+        pos = "ON"
+    elif switch_state == 0:
+        pos = "OFF"
+
+    print("switch: " + pos)
+    print("[0: off, 1: on, q: quit, any: toggle]: ")
+    char = getch()
+    cnum = ord(char)
+    if char == 'q' or char == 'Q' or cnum == 3:
+        exit()
+    elif char == '0':
+        switch_state = 0
+    elif char == '1':
+        switch_state = 1
+    else:
+        switch_state = (switch_state + 1) % 2
+
+    handle_switch_change(switch_state)
