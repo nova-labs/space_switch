@@ -324,6 +324,8 @@ old_switch_state = GPIO.input(SWITCH_GPIO)
 logger.info("STARTUP: initial value %d" % old_switch_state)
 handle_switch_change(old_switch_state)
 
+signal.signal(signal.SIGINT, signal_handler)
+
 while True:
     #current_switch_state = switch.value()
     current_switch_state = GPIO.input(SWITCH_GPIO)
