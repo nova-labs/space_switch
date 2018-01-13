@@ -312,7 +312,7 @@ logger.info("STARTUP: %d neopixels on GPIO %d" % (LED_COUNT, LED_GPIO_PIN))
 # setup switch
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setup(SWITCH_GPIO, GPIO.IN)
+GPIO.setup(SWITCH_GPIO, GPIO.OUT)
 logger.info("STARTUP: switch on GPIO %d" % (SWITCH_GPIO))
 
 # start with all LEDs dark grey

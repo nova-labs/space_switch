@@ -16,7 +16,7 @@ SWITCH_GPIO = 23
 #GPIO.setmode(GPIO.BOARD)
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setup(SWITCH_GPIO, GPIO.IN)
+GPIO.setup(SWITCH_GPIO, GPIO.OUT)
 
 print("GPIO pin %d", SWITCH_GPIO)
 print("GPIO mode %d", GPIO.getmode())
