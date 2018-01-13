@@ -24,12 +24,25 @@ current state, and transitions.
 
 ## Configuration
 
-Provide code examples and explanations of how to get the project.
+The script runs as root, since it needs write access to /dev/mem.  Clone the repository into /root/space_switch.
+
+Configure Event Service URL, in main.py.  This is the base URL of the service.
 ```bash
-WIFI_SSID = "<WiFi SSID>"
-WIFI_PASSWORD = "<password>"
-EVENT_SERVICE_BASE_URL = "http://event_service.domain:port"
+EVENT_SERVICE_BASE_URL="http://event.nova-labs.org"
 ```
+
+Install and enable init script.  This will start/stop on boot.
+```bash
+cp init.d/space_switch /etc/init.d
+systemctl enable space_switch
+```
+
+Manually start/stop.
+```bash
+systemctl start space_switch
+systemctl stop space_switch
+```
+
 
 ## State Transition Details
 ### Boot
@@ -59,9 +72,18 @@ EVENT_SERVICE_BASE_URL = "http://event_service.domain:port"
 * python >= 3.0
 * python modules
     * json
+    * logging
     * math
-    * network
     * requests
+    * requests
+    * signal
+    * sys
     * time
-    * Pin
-    * neopixel
+    * RPi.GPIO
+    * neopixel (rpi_ws281x)
+
+### NeoPixel library ([rpi_ws281x](https://github.com/jgarff/rpi_ws281x))
+The NeoPixel library controls the LEDs.
+
+### RPi.GPIO library ([RPi.GPIO](https://sourceforge.net/p/raspberry-gpio-python/wiki/Home/))
+The RPi.GPIO library reads the switch position using the GPIO pin outs.
