@@ -31,7 +31,7 @@ LOG_FILE = 'software_space_switch.log'
 
 
 #EVENT_SERVICE_BASE_URL = "http://localhost:8080"
-EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
+EVENT_SERVICE_BASE_URL = "https://event.nova-labs.org"
 EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
 EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
@@ -185,7 +185,6 @@ def shine_new_state(state):
     else:
         shine_error()
 
-
 #
 # returns now UTC as epoch milliseconds
 #
@@ -264,6 +263,7 @@ def update_state(state):
     event = get_latest_event()
     # change LEDs to reflect current state (from Event Service)
     shine_new_state(event["value"])
+    print(event)
 
 
 #
@@ -336,6 +336,7 @@ shine_boot()
 event = get_latest_event()
 # change LEDs to reflect current state (from Event Service)
 shine_new_state(event["value"])
+print(event)
 
 if event["value"] == STATE_OPEN:
     switch_state = 1

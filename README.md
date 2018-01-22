@@ -28,7 +28,7 @@ The script runs as root, since it needs write access to /dev/mem.  Clone the rep
 
 Configure Event Service URL, in main.py.  This is the base URL of the service.
 ```bash
-EVENT_SERVICE_BASE_URL="http://event.nova-labs.org"
+EVENT_SERVICE_BASE_URL="https://event.nova-labs.org"
 ```
 
 Install and enable init script.  This will start/stop on boot.

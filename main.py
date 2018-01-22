@@ -38,7 +38,7 @@ EVENT_TYPE = "novalabs_space"
 LOG_FILE = 'space_switch.log'
 
 #EVENT_SERVICE_BASE_URL = "http://localhost:8080"
-EVENT_SERVICE_BASE_URL = "http://event.nova-labs.org"
+EVENT_SERVICE_BASE_URL = "https://event.nova-labs.org"
 EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
 EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
@@ -66,7 +66,7 @@ RED        = Color(0, 255, 0)
 RED_DARK   = Color(0, 50, 0)
 GREEN      = Color(255, 0, 0)
 GREEN_DARK = Color(50, 0, 0)
-YELLOW     = Color(255, 255, 0)
+YELLOW     = Color(100, 255, 0)
 GREY       = Color(50, 50, 50)
 GREY_DARK  = Color(20, 20, 20)
 OFF        = Color(0, 0, 0)
@@ -163,7 +163,17 @@ def shine_changing_state():
 
 # turn all grey on boot
 def shine_boot():
-    shine_all(GREY_DARK)
+    delay = 200
+    colorWipe(strip, GREY_DARK)
+    time.sleep(delay)
+    colorWipe(strip, RED_DARK)
+    time.sleep(delay)
+    colorWipe(strip, YELLOW)
+    time.sleep(delay)
+    colorWipe(strip, GREEN_DARK)
+    time.sleep(delay)
+    colorWipe(strip, GREY_DARK)
+    time.sleep(delay)
 
 
 # turn off all LEDs
