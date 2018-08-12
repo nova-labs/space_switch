@@ -15,10 +15,12 @@ current state, and transitions.
 |Left LEDs|Right LEDs|State|
 |:-------:|:--------:|:----|
 | RED   | RED   |CLOSED|
+| BLUE  | BLUE  |ASSOCIATE  |
 | GREEN | GREEN |OPEN  |
 | GREY  | GREY  |BOOT  |
 | ANY   | GREY  |Switch changed, updating Event Service |
 | GREEN | DARK RED |Changing to CLOSED, Event Service updated, pulling from Event Service |
+| BLUE  | DARK BLUE |Changing to ASSOCIATE, Event Service updated, pulling from Event Service |
 | RED   | DARK GREEN |Changing to OPEN, Event Service updated, pulling from Event Service |
 | ANY   | YELLOW  |Error connecting to Event Service |
 
@@ -61,6 +63,7 @@ systemctl stop space_switch
 3. Event with new state added to Event Service (RESTful POST call)
 4. Right LEDs changed with "state changed" color
     * Dark Green - successfully updated Event Service to OPEN
+    * Dark Blue - successfully updated Event Service to ASSOCIATE
     * Dark Red - successfully updated Event Service to CLOSED
     * Yellow - error communicating with Event Service
 5. Latest event fetched from Event Service (RESTful GET call)

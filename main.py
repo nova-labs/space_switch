@@ -43,6 +43,7 @@ EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
 EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
 SWITCH_GPIO = 23
+SWITCH_TWO_GPIO = 27
 
 LED_COUNT      = 12      # Number of LED pixels.
 LED_GPIO_PIN   = 18      # GPIO pin connected to the pixels (18 uses PWM!).
@@ -66,12 +67,15 @@ RED        = Color(0, 255, 0)
 RED_DARK   = Color(0, 50, 0)
 GREEN      = Color(255, 0, 0)
 GREEN_DARK = Color(50, 0, 0)
+BLUE       = Color(0, 0, 255)
+BLUE_DARK  = Color(0, 0, 50)
 YELLOW     = Color(100, 255, 0)
 GREY       = Color(50, 50, 50)
 GREY_DARK  = Color(20, 20, 20)
 OFF        = Color(0, 0, 0)
 
 STATE_OPEN = "open"
+STATE_ASSOCIATE = "associate"
 STATE_CLOSED = "closed"
 STATE_ERROR = "error"
 STATE_NONE = "none"
@@ -136,6 +140,11 @@ def shine_open():
     shine_all(GREEN)
 
 
+# turn all red to indicate Event Service latest event is open for associates only
+def shine_associate():
+    shine_all(BLUE)
+
+
 # turn all red to indicate Event Service latest event is closed
 def shine_closed():
     shine_all(RED)
@@ -144,6 +153,11 @@ def shine_closed():
 # change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
 def shine_updated_open():
     shine_second_half(GREEN_DARK)
+
+
+# change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
+def shine_updated_associate():
+        shine_second_half(BLUE_DARK)
 
 
 # change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
@@ -185,6 +199,8 @@ def shine_off():
 def shine_updated_state(state):
     if state == STATE_OPEN:
         shine_updated_open()
+    elif state == STATE_ASSOCIATE:
+        shine_updated_associate()
     elif state == STATE_CLOSED:
         shine_updated_closed()
     else:
@@ -195,6 +211,8 @@ def shine_updated_state(state):
 def shine_new_state(state):
     if state == STATE_OPEN:
         shine_open()
+    elif state == STATE_ASSOCIATE:
+        shine_associate()
     elif state == STATE_CLOSED:
         shine_closed()
     else:
@@ -289,6 +307,14 @@ def update_open():
 
 
 #
+# update the new state to associate
+#
+def update_associate():
+    logger.info("STATE: updating new state | state " + STATE_ASSOCIATE)
+    update_state(STATE_ASSOCIATE)
+
+
+#
 # update the new state to closed
 #
 def update_closed():
@@ -299,12 +325,15 @@ def update_closed():
 #
 # handle switch change
 #
-def handle_switch_change(switch_state):
-    logger.info("SWITCH: handling switch state change | state %d" % switch_state)
+def handle_switch_change(switch_state, switch_two_state):
+    logger.info("SWITCH: handling switch state change | state %d - %d" % switch_state % switch_two_state)
     if switch_state == 0:
         update_closed()
     elif switch_state == 1:
-        update_open()
+        if switch_two_state == 1:
+            update_open()
+        else:
+            update_associate()
     else:
         logger.info("SWITCH: unknown switch state | state %d" % switch_state)
 
@@ -331,7 +360,8 @@ shine_boot()
 # get current switch value, update state with Event Service
 #old_switch_state = switch.value()
 old_switch_state = GPIO.input(SWITCH_GPIO)
-logger.info("STARTUP: initial value %d" % old_switch_state)
+old_switch_two_state = GPIO.input(SWITCH_TWO_GPIO)
+logger.info("STARTUP: initial values %d - %d" % old_switch_state % old_switch_two_state)
 handle_switch_change(old_switch_state)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -342,9 +372,11 @@ signal.signal(signal.SIGTERM, signal_handler)
 while True:
     #current_switch_state = switch.value()
     current_switch_state = GPIO.input(SWITCH_GPIO)
-    if old_switch_state == current_switch_state:
+    current_switch_two_state = GPIO.input(SWITCH_TWO_GPIO)
+    if old_switch_state == current_switch_state & old_switch_two_state == current_switch_two_state:
         time.sleep(.01)
         continue
     old_switch_state = current_switch_state
-    logger.info("SWITCH: new value %d" % current_switch_state)
-    handle_switch_change(current_switch_state)
+    old_switch_two_state = current_switch_two_state
+    logger.info("SWITCH: new values %d - %d" % current_switch_state % current_switch_two_state)
+    handle_switch_change(current_switch_state, current_switch_two_state)
