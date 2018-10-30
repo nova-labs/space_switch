@@ -14,13 +14,15 @@ current state, and transitions.
 
 |Left LEDs|Right LEDs|State|
 |:-------:|:--------:|:----|
-| RED   | RED   |CLOSED|
-| GREEN | GREEN |OPEN  |
-| GREY  | GREY  |BOOT  |
-| ANY   | GREY  |Switch changed, updating Event Service |
-| GREEN | DARK RED |Changing to CLOSED, Event Service updated, pulling from Event Service |
-| RED   | DARK GREEN |Changing to OPEN, Event Service updated, pulling from Event Service |
-| ANY   | YELLOW  |Error connecting to Event Service |
+| RED    | RED    |CLOSED|
+| ORANGE | ORANGE |ASSOCIATE  |
+| GREEN  | GREEN  |OPEN  |
+| GREY   | GREY   |BOOT  |
+| ANY    | GREY   |Switch changed, updating Event Service |
+| GREEN  | DARK RED |Changing to CLOSED, Event Service updated, pulling from Event Service |
+| ORANGE | DARK ORANGE |Changing to ASSOCIATE, Event Service updated, pulling from Event Service |
+| RED    | DARK GREEN |Changing to OPEN, Event Service updated, pulling from Event Service |
+| ANY    | YELLOW  |Error connecting to Event Service |
 
 ## Configuration
 
@@ -61,11 +63,13 @@ systemctl stop space_switch
 3. Event with new state added to Event Service (RESTful POST call)
 4. Right LEDs changed with "state changed" color
     * Dark Green - successfully updated Event Service to OPEN
+    * Dark Orange - successfully updated Event Service to ASSOCIATE
     * Dark Red - successfully updated Event Service to CLOSED
     * Yellow - error communicating with Event Service
 5. Latest event fetched from Event Service (RESTful GET call)
 6. All LEDs changed to current state color
     * Red - CLOSED
+    * Orange - Associate
     * Green - OPEN
     
 ## Dependencies
@@ -79,11 +83,15 @@ systemctl stop space_switch
     * signal
     * sys
     * time
-    * RPi.GPIO
-    * neopixel (rpi_ws281x)
+    * RPi.GPIO - install via pip3
+    * adafruit-circuitpython-neopixel - install via pip3
+    * rpi_ws281x
 
 ### NeoPixel library ([rpi_ws281x](https://github.com/jgarff/rpi_ws281x))
 The NeoPixel library controls the LEDs.
 
 ### RPi.GPIO library ([RPi.GPIO](https://sourceforge.net/p/raspberry-gpio-python/wiki/Home/))
 The RPi.GPIO library reads the switch position using the GPIO pin outs.
+
+### Adafruit CircuitPython Neopixel library ([adafruit-circuitpython-neopixel](https://github.com/adafruit/Adafruit_CircuitPython_NeoPixel))
+The CircuitPython library is now the preferred setup for accessing neopixels

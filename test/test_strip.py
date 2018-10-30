@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
 
 import time
-from neopixel import *
+import board
+import neopixel
 
-LED_COUNT = 12
-LED_PIN = 18
-LED_FREQ_HZ = 800000
-LED_DMA = 5
-LED_INVERT = False
+LED_COUNT = 10
+
+ORDER = neopixel.GRB
+pixel_pin = board.D18
 
 
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=50):
     """Wipe color across display a pixel at a time."""
-    for i in range(strip.numPixels()):
-        strip.setPixelColor(i, color)
+    for i in range(LED_COUNT):
+        strip[i] = color
         strip.show()
         time.sleep(wait_ms/1000.0)
 
-strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT)
-strip.begin()
+
+pixels = neopixel.NeoPixel(pixel_pin, LED_COUNT, brightness=0.2, auto_write=False, pixel_order=ORDER)
 
 print("Press Ctrl-c to quit")
 while True:
-    colorWipe(strip, Color(255,0,0))
-    colorWipe(strip, Color(0,255,0))
-    colorWipe(strip, Color(0,0,255))
-    
+    colorWipe(pixels, (255, 0, 0))
+    colorWipe(pixels, (0, 255, 0))
+    colorWipe(pixels, (0, 0, 255))
+    colorWipe(pixels, (255, 165, 0))
+    colorWipe(pixels, (110, 60, 0))
+    colorWipe(pixels, (90, 45, 0))
+    colorWipe(pixels, (60, 40, 0))

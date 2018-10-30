@@ -29,10 +29,12 @@ import signal
 import sys
 import time
 import RPi.GPIO as GPIO
-from neopixel import *
+import board
+import neopixel
 
 # Event Service type - this needs to be unique and not change over time
-EVENT_TYPE = "novalabs_space"
+#EVENT_TYPE = "novalabs_space"
+EVENT_TYPE = "test"
 
 # log file to this script
 LOG_FILE = 'space_switch.log'
@@ -42,36 +44,38 @@ EVENT_SERVICE_BASE_URL = "https://event.nova-labs.org"
 EVENT_SERVICE_ADD_URL = EVENT_SERVICE_BASE_URL + "/events"
 EVENT_SERVICE_STATUS_URL = EVENT_SERVICE_BASE_URL + "/events/" + EVENT_TYPE + "/latest"
 
-SWITCH_GPIO = 23
+SWITCH_ONE_GPIO = 22
+SWITCH_TWO_GPIO = 27
 
-LED_COUNT      = 12      # Number of LED pixels.
-LED_GPIO_PIN   = 18      # GPIO pin connected to the pixels (18 uses PWM!).
-#LED_GPIO_PIN   = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
-LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
-LED_DMA        = 10      # DMA channel to use for generating signal (try 10)
-LED_BRIGHTNESS = 255     # Set to 0 for darkest and 255 for brightest
-LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
-LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
-LED_STRIP      = ws.WS2811_STRIP_GRB   # Strip type and colour ordering
+# LED strip configuration:
+LED_COUNT = 10  # Number of LED pixels.
+ORDER = neopixel.GRB
+pixel_pin = board.D18
 
 
 PIXEL_ALL = list(range(LED_COUNT))
 PIXEL_HALF = math.floor(LED_COUNT/2)
 PIXEL_75_PCT = math.floor(LED_COUNT*.75)
-PIXEL_FIRST_HALF = list(range(0, PIXEL_75_PCT))
+PIXEL_FIRST_ONE = list(range(0, 0))
+PIXEL_FIRST_HALF = list(range(1, PIXEL_75_PCT))
 PIXEL_SECOND_HALF = list(range(PIXEL_75_PCT, LED_COUNT))
 
 # red & green are switched from some reason, hence the mapping
-RED        = Color(0, 255, 0)
-RED_DARK   = Color(0, 50, 0)
-GREEN      = Color(255, 0, 0)
-GREEN_DARK = Color(50, 0, 0)
-YELLOW     = Color(100, 255, 0)
-GREY       = Color(50, 50, 50)
-GREY_DARK  = Color(20, 20, 20)
-OFF        = Color(0, 0, 0)
+RED        = (255, 0, 0)
+RED_DARK   = (50, 0, 0)
+GREEN      = (0, 255, 0)
+GREEN_DARK = (0, 50, 0)
+BLUE       = (0, 0, 255)
+BLUE_DARK  = (0, 0, 50)
+ORANGE      = (110, 60, 0)
+ORANGE_DARK = (90, 45, 0)
+YELLOW     = (100, 255, 0)
+GREY       = (50, 50, 50)
+GREY_DARK  = (20, 20, 20)
+OFF        = (0, 0, 0)
 
 STATE_OPEN = "open"
+STATE_ASSOCIATE = "associate"
 STATE_CLOSED = "closed"
 STATE_ERROR = "error"
 STATE_NONE = "none"
@@ -91,14 +95,14 @@ logger = logging.getLogger("space_switch")
 
 
 def signal_handler(signal, frame):
-        colorWipe(strip, Color(0,0,0))
+        colorWipe(strip, OFF)
         sys.exit(0)
 
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=50):
         """Wipe color across display a pixel at a time."""
-        for i in range(strip.numPixels()):
-                strip.setPixelColor(i, color)
+        for i in range(LED_COUNT):
+                strip[i] = color
                 strip.show()
                 time.sleep(wait_ms/1000.0)
 
@@ -108,7 +112,7 @@ def colorWipe(strip, color, wait_ms=50):
 def shine_all(color):
     logger.info("LED: shining all | color %s" % repr(color))
     colorWipe(strip, color)
-    strip.show()
+
 
 
 #
@@ -117,7 +121,7 @@ def shine_all(color):
 def shine_second_half(color):
     logger.info("LED: shining second half | color %s" % repr(color))
     for i in PIXEL_SECOND_HALF:
-        strip.setPixelColor(i, color)
+        strip[i] = color
     strip.show()
 
 
@@ -127,13 +131,18 @@ def shine_second_half(color):
 def shine_alternate(color):
     logger.info("LED: shining alternate | color %s" % repr(color))
     for i in range(LED_COUNT)[::2]:
-        strip.setPixelColor(i, color)
+        strip[i] = color
     strip.show()
 
 
 # turn all green to indicate Event Service latest event is open
 def shine_open():
     shine_all(GREEN)
+
+
+# turn all red to indicate Event Service latest event is open for associates only
+def shine_associate():
+    shine_all(ORANGE)
 
 
 # turn all red to indicate Event Service latest event is closed
@@ -144,6 +153,11 @@ def shine_closed():
 # change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
 def shine_updated_open():
     shine_second_half(GREEN_DARK)
+
+
+# change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
+def shine_updated_associate():
+    shine_second_half(ORANGE_DARK)
 
 
 # change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
@@ -163,7 +177,7 @@ def shine_changing_state():
 
 # turn all grey on boot
 def shine_boot():
-    delay = 200
+    delay = 2
     colorWipe(strip, GREY_DARK)
     time.sleep(delay)
     colorWipe(strip, RED_DARK)
@@ -185,6 +199,8 @@ def shine_off():
 def shine_updated_state(state):
     if state == STATE_OPEN:
         shine_updated_open()
+    elif state == STATE_ASSOCIATE:
+        shine_updated_associate()
     elif state == STATE_CLOSED:
         shine_updated_closed()
     else:
@@ -195,6 +211,8 @@ def shine_updated_state(state):
 def shine_new_state(state):
     if state == STATE_OPEN:
         shine_open()
+    elif state == STATE_ASSOCIATE:
+        shine_associate()
     elif state == STATE_CLOSED:
         shine_closed()
     else:
@@ -218,8 +236,7 @@ def get_latest_event():
         code = response.status_code
     except:
         code = HTTP_ERROR
-
-    event = 0
+        event = 0
     if code == HTTP_OK:
         # good response
         event = response.json()
@@ -289,6 +306,14 @@ def update_open():
 
 
 #
+# update the new state to associate
+#
+def update_associate():
+    logger.info("STATE: updating new state | state " + STATE_ASSOCIATE)
+    update_state(STATE_ASSOCIATE)
+
+
+#
 # update the new state to closed
 #
 def update_closed():
@@ -299,14 +324,18 @@ def update_closed():
 #
 # handle switch change
 #
-def handle_switch_change(switch_state):
-    logger.info("SWITCH: handling switch state change | state %d" % switch_state)
-    if switch_state == 0:
-        update_closed()
-    elif switch_state == 1:
+def handle_switch_change(switch_one_state, switch_two_state):
+    logger.info("SWITCH: handling switch state change | state %d - %d" % (switch_one_state, switch_two_state))
+    if switch_one_state == 1:
+        if switch_two_state == 0:
+            update_closed()
+        else:
+            logger.info("SWITCH: unknown switch state | state %d - %d" % (switch_one_state, switch_two_state))
+    elif switch_two_state == 1:
         update_open()
     else:
-        logger.info("SWITCH: unknown switch state | state %d" % switch_state)
+       update_associate()
+
 
 
 # ----------------------------------------------------------------------------
@@ -315,24 +344,25 @@ def handle_switch_change(switch_state):
 logger.info("STARTUP: starting")
 
 # setup NeoPixel
-strip = Adafruit_NeoPixel(LED_COUNT, LED_GPIO_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-strip.begin()
-logger.info("STARTUP: %d neopixels on GPIO %d" % (LED_COUNT, LED_GPIO_PIN))
+strip = neopixel.NeoPixel(pixel_pin, LED_COUNT, brightness=0.2, auto_write=False, pixel_order=ORDER)
+logger.info("STARTUP: %d neopixels on GPIO %d" % (LED_COUNT, 18))
 
 # setup switch
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setup(SWITCH_GPIO, GPIO.OUT)
-logger.info("STARTUP: switch on GPIO %d" % (SWITCH_GPIO))
+GPIO.setup(SWITCH_ONE_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(SWITCH_TWO_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+logger.info("STARTUP: switch on GPIOs %d & %d" % (SWITCH_ONE_GPIO, SWITCH_TWO_GPIO))
 
 # start with all LEDs dark grey
 shine_boot()
 
 # get current switch value, update state with Event Service
 #old_switch_state = switch.value()
-old_switch_state = GPIO.input(SWITCH_GPIO)
-logger.info("STARTUP: initial value %d" % old_switch_state)
-handle_switch_change(old_switch_state)
+old_switch_one_state = GPIO.input(SWITCH_ONE_GPIO)
+old_switch_two_state = GPIO.input(SWITCH_TWO_GPIO)
+logger.info("STARTUP: initial values %d - %d" % (old_switch_one_state, old_switch_two_state))
+handle_switch_change(old_switch_one_state, old_switch_two_state)
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGABRT, signal_handler)
@@ -340,11 +370,12 @@ signal.signal(signal.SIGHUP, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 while True:
-    #current_switch_state = switch.value()
-    current_switch_state = GPIO.input(SWITCH_GPIO)
-    if old_switch_state == current_switch_state:
-        time.sleep(.01)
+    current_switch_one_state = GPIO.input(SWITCH_ONE_GPIO)
+    current_switch_two_state = GPIO.input(SWITCH_TWO_GPIO)
+    if old_switch_one_state == current_switch_one_state and old_switch_two_state == current_switch_two_state:
+        time.sleep(.5)
         continue
-    old_switch_state = current_switch_state
-    logger.info("SWITCH: new value %d" % current_switch_state)
-    handle_switch_change(current_switch_state)
+    old_switch_one_state = current_switch_one_state
+    old_switch_two_state = current_switch_two_state
+    logger.info("SWITCH: new values %d - %d" % (current_switch_one_state, current_switch_two_state))
+    handle_switch_change(current_switch_one_state, current_switch_two_state)
