@@ -20,7 +20,7 @@ current state, and transitions.
 | GREY   | GREY   |BOOT  |
 | ANY    | GREY   |Switch changed, updating Event Service |
 | GREEN  | DARK RED |Changing to CLOSED, Event Service updated, pulling from Event Service |
-| BLUE   | DARK ORANGE |Changing to ASSOCIATE, Event Service updated, pulling from Event Service |
+| ORANGE | DARK ORANGE |Changing to ASSOCIATE, Event Service updated, pulling from Event Service |
 | RED    | DARK GREEN |Changing to OPEN, Event Service updated, pulling from Event Service |
 | ANY    | YELLOW  |Error connecting to Event Service |
 
