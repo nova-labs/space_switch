@@ -27,43 +27,46 @@ import signal
 import sys
 #from machine import Pin
 import RPi.GPIO as GPIO
-from neopixel import *
+import board
+import neopixel
 
-SWITCH_GPIO = 23
+SWITCH_ONE_GPIO = 22
+SWITCH_TWO_GPIO = 27
 
-LED_COUNT      = 12      # Number of LED pixels.
-LED_GPIO_PIN   = 18      # GPIO pin connected to the pixels (18 uses PWM!).
-#LED_GPIO_PIN   = 10      # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
-LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
-LED_DMA        = 10      # DMA channel to use for generating signal (try 10)
-LED_BRIGHTNESS = 255     # Set to 0 for darkest and 255 for brightest
-LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
-LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
-LED_STRIP      = ws.WS2811_STRIP_GRB   # Strip type and colour ordering
-
+# LED strip configuration:
+LED_COUNT = 10  # Number of LED pixels.
+ORDER = neopixel.GRB
+pixel_pin = board.D18
 
 PIXEL_ALL = list(range(LED_COUNT))
 PIXEL_HALF = math.floor(LED_COUNT/2)
 PIXEL_75_PCT = math.floor(LED_COUNT*.75)
-PIXEL_FIRST_HALF = list(range(0, PIXEL_75_PCT))
+PIXEL_FIRST_ONE = list(range(0, 0))
+PIXEL_FIRST_HALF = list(range(1, PIXEL_75_PCT))
 PIXEL_SECOND_HALF = list(range(PIXEL_75_PCT, LED_COUNT))
 
-RED        = Color(0, 255, 0)
-RED_DARK   = Color(0, 50, 0)
-GREEN      = Color(255, 0, 0)
-GREEN_DARK = Color(50, 0, 0)
-YELLOW     = Color(255, 255, 0)
-GREY       = Color(50, 50, 50)
-GREY_DARK  = Color(20, 20, 20)
-OFF        = Color(0, 0, 0)
-    
+RED        = (255, 0, 0)
+RED_DARK   = (50, 0, 0)
+GREEN      = (0, 255, 0)
+GREEN_DARK = (0, 50, 0)
+BLUE       = (0, 0, 255)
+BLUE_DARK  = (0, 0, 50)
+ORANGE      = (110, 60, 0)
+ORANGE_DARK = (90, 45, 0)
+YELLOW     = (255, 255, 0)
+GREY       = (50, 50, 50)
+GREY_DARK  = (20, 20, 20)
+OFF        = (0, 0, 0)
+
+
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=50):
-	"""Wipe color across display a pixel at a time."""
-	for i in range(strip.numPixels()):
-		strip.setPixelColor(i, color)
-		strip.show()
-		time.sleep(wait_ms/1000.0)
+    """Wipe color across display a pixel at a time."""
+    for i in range(strip.n):
+        strip[i] = color
+        strip.show()
+        time.sleep(wait_ms / 1000.0)
+
 
 #
 # shine all pixels this color
@@ -78,7 +81,7 @@ def shine_all(color):
 #
 def shine_second_half(color):
     for i in PIXEL_SECOND_HALF:
-        strip.setPixelColor(i, color)
+        strip[i] = color
     strip.show()
 
 
@@ -87,7 +90,7 @@ def shine_second_half(color):
 #
 def shine_alternate(color):
     for i in range(LED_COUNT)[::2]:
-        strip.setPixelColor(i, color)
+        strip[i] = color
     strip.show()
 
 
@@ -101,6 +104,11 @@ def shine_closed():
     shine_all(RED)
 
 
+# turn all red to indicate Event Service latest event is closed
+def shine_associate():
+    shine_all(ORANGE)
+
+
 # change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
 def shine_updated_open():
     shine_second_half(GREEN_DARK)
@@ -109,6 +117,11 @@ def shine_updated_open():
 # change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
 def shine_updated_closed():
     shine_second_half(RED_DARK)
+
+
+# change LEDs to reflect Event Service updated with new state, waiting to confirm by fetching event from Event Service
+def shine_updated_associate():
+    shine_second_half(ORANGE_DARK)
 
 
 # change LEDs to yellow to indicate error
@@ -131,38 +144,47 @@ def shine_off():
     shine_all(OFF)
 
 
-
 # setup NeoPixel
-strip = Adafruit_NeoPixel(LED_COUNT, LED_GPIO_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-strip.begin()
-
+strip = neopixel.NeoPixel(pixel_pin, LED_COUNT, brightness=0.2, auto_write=False, pixel_order=ORDER)
 
 shine_boot()
 time.sleep(1)
 
-
+print("1")
 shine_changing_state()
 time.sleep(1)
 
+print("2")
 shine_updated_closed()
 time.sleep(1)
 
+print("3")
 shine_closed()
 time.sleep(1)
 
-
+print("4")
 shine_changing_state()
 time.sleep(1)
 
+print("5")
 shine_updated_open()
 time.sleep(1)
 
+print("6")
 shine_open()
 time.sleep(1)
 
+print("7")
+shine_updated_associate()
+time.sleep(1)
+
+print("8")
+shine_associate()
+time.sleep(1)
+
+print("9")
 shine_updated_open()
 time.sleep(1)
 
+print("10")
 shine_off()
-
-
